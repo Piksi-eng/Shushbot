@@ -7,10 +7,12 @@ import time
 from playsound import playsound
 import threading
 
+#Global Variables
 
 def get_max_loudness(duration=0.1, fs=44100):
     loudness_values = []
-
+    min_db = -60  # Define silence as -60 dB
+    max_db = 0    # Define max loudness as 0 dB
     # Record audio in chunks and calculate loudness
     for _ in range(int(duration * fs / 1024)):  # Process in 1024-sample chunks
         audio = sd.rec(1024, samplerate=fs, channels=1, dtype='float64')
@@ -20,8 +22,9 @@ def get_max_loudness(duration=0.1, fs=44100):
         rms = np.sqrt(np.mean(np.square(audio)))
 
         # Convert RMS to dB
-        loudness = 20 * np.log10(rms) if rms > 0 else -np.inf
-        loudness_values.append(loudness)
+        loudness = 20 * np.log10(rms) if rms > 0 else min_db
+        normalized_loudness = np.clip((loudness - min_db) / (max_db - min_db) * 100, 0, 100)
+        loudness_values.append(normalized_loudness)
 
     # Return the maximum loudness value
     max_loudness = max(loudness_values)
@@ -45,7 +48,6 @@ def create_ring():
     canvas.create_rectangle(0, 0, screen_width, screen_height, fill='#8B0000', outline='#8B0000')
 
     # Draw a transparent center (you can adjust the size of the transparent area)
-    center_radius = min(screen_width, screen_height) / 4  # Adjust as needed
     canvas.create_rectangle(
         0 + stroke, 0 + stroke, screen_width - stroke, screen_height - stroke,
         fill='#4682B4', outline='', width=5
@@ -61,6 +63,7 @@ def listen():
     ring = None
     while True:
         max_loudness = get_max_loudness()
+        progress_float.set(max_loudness)
         if(max_loudness > scale_float.get()):
             if ring is None:  # Create the ring if it doesn't exist
                 sound_thread = threading.Thread(target=play_sound, args=(sound_file,))
@@ -77,19 +80,25 @@ def listen():
 
 # Example usage
 if __name__ == "__main__":
-    listen_thread = threading.Thread(target=listen)
-    listen_thread.start()
     sound_file = 'shushhh.mp3'
-    threshold = -10
+    threshold = 80
     window = tk.Tk()
     window.title("ShushBot")
-    scale_float = tk.DoubleVar(value = -10)
+    scale_float = tk.DoubleVar(value = 80)
     scale = ttk.Scale(window, 
                       command = lambda value: print(scale_float.get()), 
-                      from_= -80, 
-                      to= 0,
+                      from_= 0, 
+                      to= 100,
                     variable= scale_float )
     scale.pack()
+    progress_float = tk.DoubleVar(value=0)
+    progress = ttk.Progressbar(window,
+                               variable = progress_float,
+                               maximum=  100)
+    progress.pack()
+
+    listen_thread = threading.Thread(target=listen)
+    listen_thread.start()
 
     window.mainloop()
             
