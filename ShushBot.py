@@ -61,29 +61,34 @@ def play_sound(file_path):
     playsound(file_path)
 
 def listen():
+    global listening
+    print("Thred is listening" if listening else "Thred is not listening")
     ring = None
-    while True:
-        max_loudness = get_max_loudness()
+    while  True:
+        if(listening):     
+            max_loudness = get_max_loudness()
+            progress_float.set(max_loudness/100)
 
-        #current_loudness = progress_float.get()
-    
-        #step = (max_loudness - current_loudness) * 0.2  # 20% step towards target
-        #smoothed_value = current_loudness + step
-
-        progress_float.set(max_loudness)
-        if(max_loudness > scale_float.get()):
-            if ring is None:  # Create the ring if it doesn't exist
-                sound_thread = threading.Thread(target=play_sound, args=(sound_file,))
-                ring = create_ring()               
-                sound_thread.start()            
-                print(f"Maximum Loudness: {max_loudness:.2f} dB")
-                print("You are too loud!!")
-            ring.deiconify()  # Show the ring
+            if(max_loudness > scale_float.get()):
+                if ring is None:  # Create the ring if it doesn't exist
+                    sound_thread = threading.Thread(target=play_sound, args=(sound_file,))
+                    ring = create_ring()               
+                    sound_thread.start()            
+                    print(f"Maximum Loudness: {max_loudness:.2f} dB")
+                    print("You are too loud!!")
+                ring.deiconify()  # Show the ring
+            else:
+                if ring is not None:  # Hide the ring if it exists
+                    ring.withdraw()
+                    ring = None
+            time.sleep(0.1)
         else:
-            if ring is not None:  # Hide the ring if it exists
-                ring.withdraw()
-                ring = None
-        time.sleep(0.1)
+            time.sleep(0.5)
+
+def toggleListen():
+    global listening
+    listening = listenSwitch.get()
+    print("Listening started..." if listening else "Listening stopped.")
 
 # Example usage
 if __name__ == "__main__":
@@ -92,26 +97,55 @@ if __name__ == "__main__":
     threshold = 80
 
     #window config
-    window = tk.Tk()
-    window.geometry("420x420")
+    window = CTk()
+    window.geometry("220x220")
     window.title("ShushBot")
     icon = tk.PhotoImage(file='Images\icon.png')
     window.iconphoto(True, icon)
-    window.config(background="#5cfcff")
+    set_default_color_theme("dark-blue")
+    #window.config(background="#5cfcff")
 
     #window parts
+    deviceFrame = CTkFrame(window)
+    #deviceFrame.pack()
+    inputCombobox = CTkComboBox(deviceFrame, values=["mic 1","mic 2","mic 3"],)
+    inputCombobox.pack()
+
+    outputCombobox = CTkComboBox(deviceFrame, values=["device 1","device 2","device 3"],)
+    outputCombobox.pack()
+
+    soundSwitch = CTkSwitch(window,text="Sound")
+    soundSwitch.select()
+    soundSwitch.pack()
+
+    flashSwitch = CTkSwitch(window,text="Flash")
+    flashSwitch.select()
+    flashSwitch.pack()
+
+    scaleLable = CTkLabel(window,text="Threshold slider :", font=("Arial",20))  
+    scaleLable.pack()
+
+    scaleFrame = CTkFrame(window)
+    scaleFrame.pack()
+    scaleInput = CTkEntry(scaleFrame, placeholder_text="80")
+    scaleInput.pack()
+
     scale_float = tk.DoubleVar(value = 80)
-    scale = ttk.Scale(window, 
+    scale = CTkSlider(scaleFrame, 
                       command = lambda value: print(scale_float.get()), 
                       from_= 0, 
                       to= 100,
                     variable= scale_float )
     scale.pack()
     progress_float = tk.DoubleVar(value=0)
-    progress = ttk.Progressbar(window,
-                               variable = progress_float,
-                               maximum=  100)
+    progress = CTkProgressBar(scaleFrame,
+                               variable = progress_float)
     progress.pack()
+
+    listenSwitch = CTkSwitch(window,text="Listen", command=toggleListen)
+    listenSwitch.deselect()
+    listening = listenSwitch.get()
+    listenSwitch.pack()
 
     listen_thread = threading.Thread(target=listen)
     listen_thread.start()
