@@ -3,6 +3,7 @@ import sounddevice as sd
 from plyer import notification
 import tkinter as tk
 from tkinter import ttk
+from customtkinter import *
 import time
 from playsound import playsound
 import threading
@@ -63,6 +64,12 @@ def listen():
     ring = None
     while True:
         max_loudness = get_max_loudness()
+
+        #current_loudness = progress_float.get()
+    
+        #step = (max_loudness - current_loudness) * 0.2  # 20% step towards target
+        #smoothed_value = current_loudness + step
+
         progress_float.set(max_loudness)
         if(max_loudness > scale_float.get()):
             if ring is None:  # Create the ring if it doesn't exist
@@ -80,10 +87,19 @@ def listen():
 
 # Example usage
 if __name__ == "__main__":
-    sound_file = 'shushhh.mp3'
+    #variables
+    sound_file = 'Sounds\Pst.mp3'
     threshold = 80
+
+    #window config
     window = tk.Tk()
+    window.geometry("420x420")
     window.title("ShushBot")
+    icon = tk.PhotoImage(file='Images\icon.png')
+    window.iconphoto(True, icon)
+    window.config(background="#5cfcff")
+
+    #window parts
     scale_float = tk.DoubleVar(value = 80)
     scale = ttk.Scale(window, 
                       command = lambda value: print(scale_float.get()), 
