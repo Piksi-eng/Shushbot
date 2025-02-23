@@ -39,6 +39,8 @@ def create_ring():
     ring.attributes('-fullscreen', True)  # Make the window fullscreen
     ring.overrideredirect(True)  # Remove window decorations
     ring.wm_attributes('-transparentcolor','#4682B4')
+    
+
     # Create a canvas that fills the window
     screen_width = ring.winfo_screenwidth()
     screen_height = ring.winfo_screenheight()
@@ -58,10 +60,14 @@ def create_ring():
     return ring
 
 def play_sound(file_path):
-    playsound(file_path)
+    global playSound
+    if(playSound):
+        playsound(file_path)
+
 
 def listen():
     global listening
+    global flash
     print("Thred is listening" if listening else "Thred is not listening")
     ring = None
     while  True:
@@ -70,13 +76,15 @@ def listen():
             progress_float.set(max_loudness/100)
 
             if(max_loudness > scale_float.get()):
-                if ring is None:  # Create the ring if it doesn't exist
-                    sound_thread = threading.Thread(target=play_sound, args=(sound_file,))
-                    ring = create_ring()               
-                    sound_thread.start()            
-                    print(f"Maximum Loudness: {max_loudness:.2f} dB")
-                    print("You are too loud!!")
-                ring.deiconify()  # Show the ring
+                #play_sound(sound_file)
+                threading.Thread(target=play_sound, args=(sound_file,), daemon=True).start()
+                print(f"Maximum Loudness: {max_loudness:.2f} dB")
+                print("You are too loud!!")
+                print(flash)
+                if ring is None and flash:  # Create the ring if it doesn't exist
+                    ring = create_ring() 
+                    ring.deiconify()
+                  # Show the ring
             else:
                 if ring is not None:  # Hide the ring if it exists
                     ring.withdraw()
@@ -88,7 +96,14 @@ def listen():
 def toggleListen():
     global listening
     listening = listenSwitch.get()
-    print("Listening started..." if listening else "Listening stopped.")
+
+def toggleSound():
+    global playSound
+    playSound = soundSwitch.get()
+    
+def toggleFlash():
+    global flash
+    flash = flashSwitch.get()
 
 # Example usage
 if __name__ == "__main__":
@@ -98,10 +113,10 @@ if __name__ == "__main__":
 
     #window config
     window = CTk()
-    window.geometry("220x220")
+    window.geometry("220x160")
     window.title("ShushBot")
-    icon = tk.PhotoImage(file='Images\icon.png')
-    window.iconphoto(True, icon)
+    #icon = tk.PhotoImage(file='Images\icon.png')
+    #window.iconphoto(True, icon)
     set_default_color_theme("dark-blue")
     #window.config(background="#5cfcff")
 
@@ -114,12 +129,14 @@ if __name__ == "__main__":
     outputCombobox = CTkComboBox(deviceFrame, values=["device 1","device 2","device 3"],)
     outputCombobox.pack()
 
-    soundSwitch = CTkSwitch(window,text="Sound")
+    soundSwitch = CTkSwitch(window,text="Sound", command=toggleSound)
     soundSwitch.select()
+    playSound = soundSwitch.get()
     soundSwitch.pack()
 
-    flashSwitch = CTkSwitch(window,text="Flash")
+    flashSwitch = CTkSwitch(window,text="Flash", command=toggleFlash)
     flashSwitch.select()
+    flash = flashSwitch.get()
     flashSwitch.pack()
 
     scaleLable = CTkLabel(window,text="Threshold slider :", font=("Arial",20))  
@@ -128,7 +145,7 @@ if __name__ == "__main__":
     scaleFrame = CTkFrame(window)
     scaleFrame.pack()
     scaleInput = CTkEntry(scaleFrame, placeholder_text="80")
-    scaleInput.pack()
+    #scaleInput.pack()
 
     scale_float = tk.DoubleVar(value = 80)
     scale = CTkSlider(scaleFrame, 
@@ -147,7 +164,7 @@ if __name__ == "__main__":
     listening = listenSwitch.get()
     listenSwitch.pack()
 
-    listen_thread = threading.Thread(target=listen)
+    listen_thread = threading.Thread(target=listen, daemon=True)
     listen_thread.start()
 
     window.mainloop()
