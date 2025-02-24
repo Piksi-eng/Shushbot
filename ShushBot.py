@@ -7,6 +7,7 @@ from customtkinter import *
 import time
 from playsound import playsound
 import threading
+import queue
 
 #Global Variables
 
@@ -59,6 +60,17 @@ def create_ring():
     ring.update()
     return ring
 
+
+def sound_worker(file_path):
+    global is_playing_sound
+    while True:  # Wait for a sound file
+        if file_path is None:  # Exit condition
+            break
+        try:
+            playsound(file_path)  # Play the sound asynchronously
+        except Exception as e:
+            print(f"Error playing sound: {e}")
+
 def play_sound(file_path):
     global playSound
     if(playSound):
@@ -77,7 +89,7 @@ def listen():
 
             if(max_loudness > scale_float.get()):
                 #play_sound(sound_file)
-                threading.Thread(target=play_sound, args=(sound_file,), daemon=True).start()
+                #threading.Thread(target=play_sound, args=(sound_file,), daemon=True).start()
                 print(f"Maximum Loudness: {max_loudness:.2f} dB")
                 print("You are too loud!!")
                 print(flash)
@@ -110,6 +122,7 @@ if __name__ == "__main__":
     #variables
     sound_file = 'Sounds\Pst.mp3'
     threshold = 80
+    is_playing_sound = False
 
     #window config
     window = CTk()
@@ -163,6 +176,9 @@ if __name__ == "__main__":
     listenSwitch.deselect()
     listening = listenSwitch.get()
     listenSwitch.pack()
+
+    sound_thread = threading.Thread(target=sound_worker, daemon=True, args="sound_file")
+    sound_thread.start()
 
     listen_thread = threading.Thread(target=listen, daemon=True)
     listen_thread.start()
