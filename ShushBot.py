@@ -7,9 +7,13 @@ from customtkinter import *
 import time
 from playsound import playsound
 import threading
-import queue
+import pygame
 
 #Global Variables
+cooldown_time = 3  # Cooldown in seconds
+last_played = 0  # Stores the last time a sound was played
+
+pygame.mixer.init()
 
 def get_max_loudness(duration=0.1, fs=44100):
     loudness_values = []
@@ -60,24 +64,23 @@ def create_ring():
     ring.update()
     return ring
 
-
-def sound_worker(file_path):
-    global is_playing_sound
-    while True:  # Wait for a sound file
-        if file_path is None:  # Exit condition
-            break
-        try:
-            playsound(file_path)  # Play the sound asynchronously
-        except Exception as e:
-            print(f"Error playing sound: {e}")
-
+    #depricated
 def play_sound(file_path):
-    global playSound
-    if(playSound):
-        playsound(file_path)
+    global last_played
+    last_played = time.time()
+    playsound(file_path)
 
+def play_soundv2(sound_file):
+    global last_played
+    sound = pygame.mixer.Sound(sound_file)
+    sound.play()
+    while pygame.mixer.get_busy():  # Wait for sound to finish
+        time.sleep(0.1)
+    last_played = time.time()  # Update last played time
 
 def listen():
+    global last_played
+    global playSound
     global listening
     global flash
     print("Thred is listening" if listening else "Thred is not listening")
@@ -88,11 +91,12 @@ def listen():
             progress_float.set(max_loudness/100)
 
             if(max_loudness > scale_float.get()):
-                #play_sound(sound_file)
-                #threading.Thread(target=play_sound, args=(sound_file,), daemon=True).start()
+                if(playSound and (time.time() - last_played >= cooldown_time)):
+                    threading.Thread(target=play_soundv2, args=(sound_file,), daemon=True).start()
+
                 print(f"Maximum Loudness: {max_loudness:.2f} dB")
                 print("You are too loud!!")
-                print(flash)
+
                 if ring is None and flash:  # Create the ring if it doesn't exist
                     ring = create_ring() 
                     ring.deiconify()
@@ -101,7 +105,7 @@ def listen():
                 if ring is not None:  # Hide the ring if it exists
                     ring.withdraw()
                     ring = None
-            time.sleep(0.1)
+            time.sleep(0.66)
         else:
             time.sleep(0.5)
 
@@ -117,6 +121,8 @@ def toggleFlash():
     global flash
     flash = flashSwitch.get()
 
+def validate_int_input(value):
+    return value.isdigit() or value == ""
 # Example usage
 if __name__ == "__main__":
     #variables
@@ -142,15 +148,34 @@ if __name__ == "__main__":
     outputCombobox = CTkComboBox(deviceFrame, values=["device 1","device 2","device 3"],)
     outputCombobox.pack()
 
-    soundSwitch = CTkSwitch(window,text="Sound", command=toggleSound)
+    notificationFrame = CTkFrame(window)
+    notificationFrame.pack()
+
+    validate_int = window.register(validate_int_input)
+
+    soundFrame = CTkFrame(notificationFrame)
+    soundFrame.pack()
+    soundSwitch = CTkSwitch(soundFrame,text="Sound", command=toggleSound)
     soundSwitch.select()
     playSound = soundSwitch.get()
-    soundSwitch.pack()
+    soundSwitch.pack(side="left", padx=5, pady=5)
+    flashLabel = CTkLabel(soundFrame, text="CoolDown(s):", font=("Arial",15))
+    flashLabel.pack()
+    soundCoolDown = CTkEntry(soundFrame, placeholder_text="3",validate="key", validatecommand=(validate_int, "%P"))
+    soundCoolDown.pack(side="right", padx=5, pady=5)
 
-    flashSwitch = CTkSwitch(window,text="Flash", command=toggleFlash)
+    flashFrame = CTkFrame(notificationFrame)
+    flashFrame.pack()
+    flashSwitch = CTkSwitch(flashFrame,text="Flash", command=toggleFlash)
     flashSwitch.select()
     flash = flashSwitch.get()
-    flashSwitch.pack()
+    flashSwitch.pack(side="left", padx=5, pady=5)
+    flashLabel = CTkLabel(flashFrame, text="CoolDown(s):", font=("Arial",15))
+    flashLabel.pack()
+    flashCoolDown = CTkEntry(flashFrame, placeholder_text="0", validate="key", validatecommand=(validate_int, "%P"))
+    flashCoolDown.pack(side="right", padx=5, pady=5)
+
+
 
     scaleLable = CTkLabel(window,text="Threshold slider :", font=("Arial",20))  
     scaleLable.pack()
@@ -176,9 +201,6 @@ if __name__ == "__main__":
     listenSwitch.deselect()
     listening = listenSwitch.get()
     listenSwitch.pack()
-
-    sound_thread = threading.Thread(target=sound_worker, daemon=True, args="sound_file")
-    sound_thread.start()
 
     listen_thread = threading.Thread(target=listen, daemon=True)
     listen_thread.start()
