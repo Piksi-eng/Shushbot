@@ -8,15 +8,44 @@ import time
 from playsound import playsound
 import threading
 import pygame
+from PIL import Image, ImageTk
+import pystray
 
 #Global Variables
 cooldown_time_sound = 3
 cooldown_time_flash = 0  # Cooldown in seconds
 last_played = 0  # Stores the last time a sound was played
 last_flashed = 0
-
+devices = sd.query_devices()
+input_devices = [d['name'] for d in devices if d['max_input_channels'] > 0]
+all_files = os.listdir("Sounds")
+sound_files = [file for file in all_files if file.endswith(('.mp3', '.wav'))]
 
 pygame.mixer.init()
+
+def hide_window():
+    window.withdraw()  # Hide the window
+    show_tray_icon()
+
+def restore_window(icon, item):
+    icon.stop()
+    window.after(0, window.deiconify)
+
+def create_icon():
+    return Image.open("Images\icon.png") 
+
+def show_tray_icon():
+    icon_image = create_icon()
+    menu = pystray.Menu(pystray.MenuItem("Show", restore_window), pystray.MenuItem("Quit", exit_app))
+    tray_icon = pystray.Icon("AppName", icon_image, "App Running", menu)
+    tray_thread = threading.Thread(target=tray_icon.run, daemon=True)
+    tray_thread.start()
+
+def exit_app(icon=None, item=None):
+    if icon:
+        icon.stop()  # Stop tray icon
+    window.quit()
+    window.destroy()  # Close the Tkinter app
 
 def get_max_loudness(duration=0.1, fs=44100):
     loudness_values = []
@@ -156,6 +185,21 @@ def update_entry_from_slider(value):
     scaleInput.delete(0, tk.END)
     scaleInput.insert(0, str(int(float(value))))
 
+def list_input_devices():
+    devices = sd.query_devices()
+    input_devices = [d['name'] for d in devices if d['max_input_channels'] > 0]
+    for i, device in enumerate(input_devices):
+        print(f"{i}: {device}")
+
+def update_selected_device(choice):
+    selected_index = next((i for i, d in enumerate(devices) if d['name'] == choice), None)
+    if selected_index is not None:
+        sd.default.device = (selected_index, None)
+        print(f"Selected input device: {choice} (Index {selected_index})")
+
+def update_selected_file(value):
+    global sound_file
+    sound_file = f'Sounds\{value}'
 
 if __name__ == "__main__":
     #variables
@@ -167,8 +211,11 @@ if __name__ == "__main__":
     window = CTk()
     window.geometry("300x220")
     window.title("ShushBot")
-    #icon = tk.PhotoImage(file='Images\icon.png')
-    #window.iconphoto(True, icon)
+    window.protocol("WM_DELETE_WINDOW", hide_window)
+    #image = Image.open('Images/icon.png')
+    #tk_icon = ImageTk.PhotoImage(image)
+    #icon = CTkImage(light_image=image, dark_image=image)
+    window.iconbitmap('Images/icon.ico')
     set_default_color_theme("dark-blue")
     #window.config(background="#5cfcff")
     Tabs = CTkTabview(window)
@@ -176,16 +223,29 @@ if __name__ == "__main__":
 
     mainTab = Tabs.add("Main")
     settingsTab = Tabs.add("Settings")
-    deviceTab = Tabs.add("Device")
+    advancedTab = Tabs.add("Advanced")
 
     #window parts
-    deviceFrame = CTkFrame(deviceTab)
-    deviceFrame.pack()
-    inputCombobox = CTkComboBox(deviceFrame, values=["mic 1","mic 2","mic 3"],)
-    inputCombobox.pack()
+    advancedFrame = CTkFrame(advancedTab)
+    advancedFrame.pack()
+    inputFrame = CTkFrame(advancedFrame)
+    inputFrame.pack(padx=5, pady=5)
+    inputLabel = CTkLabel(inputFrame, text="Input Device:", font=("Roboto",15))
+    inputLabel.pack(side="left", padx=5, pady=5)
+    inputCombobox = CTkComboBox(inputFrame, values=input_devices, command=update_selected_device)
+    inputCombobox.pack(side="right", padx=5, pady=5)
 
-    outputCombobox = CTkComboBox(deviceFrame, values=["device 1","device 2","device 3"],)
-    outputCombobox.pack()
+    soundFileFrame = CTkFrame(advancedFrame)
+    soundFileFrame.pack(padx=5, pady=5)
+    soundFileLabel = CTkLabel(soundFileFrame, text="Sound", font=("Roboto",15))
+    soundFileLabel.pack(side="left", padx=5, pady=5)
+    inputCombobox = CTkComboBox(soundFileFrame, values=sound_files, command=update_selected_file)
+    inputCombobox.pack(side="right", padx=5, pady=5)
+
+
+
+    #outputCombobox = CTkComboBox(advancedFrame, values=["device 1","device 2","device 3"],)
+    #outputCombobox.pack()
 
     notificationFrame = CTkFrame(settingsTab)
     notificationFrame.pack()
