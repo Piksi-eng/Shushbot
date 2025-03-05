@@ -13,6 +13,8 @@ import pygame
 cooldown_time_sound = 3
 cooldown_time_flash = 0  # Cooldown in seconds
 last_played = 0  # Stores the last time a sound was played
+last_flashed = 0
+
 
 pygame.mixer.init()
 
@@ -61,7 +63,8 @@ def create_ring():
         0 + stroke, 0 + stroke, screen_width - stroke, screen_height - stroke,
         fill='#4682B4', outline='', width=5
     )
-
+    global last_flashed
+    last_flashed = time.time()
     ring.update()
     return ring
 
@@ -82,6 +85,7 @@ def play_soundv2(sound_file):
 
 def listen():
     global last_played
+    global last_flashed
     global playSound
     global listening
     global flash
@@ -99,7 +103,7 @@ def listen():
                 print(f"Maximum Loudness: {max_loudness:.2f} dB")
                 print("You are too loud!!")
 
-                if ring is None and flash:  # Create the ring if it doesn't exist
+                if ring is None and flash and (time.time() - last_flashed >= cooldown_time_flash):  # Create the ring if it doesn't exist
                     ring = create_ring() 
                     ring.deiconify()
                   # Show the ring
@@ -138,6 +142,21 @@ def update_cooldown_flash():
     cooldown_time_flash = int(value) if value.isdigit() else 0  # Convert to int or default to 0
     print(f"Updated cooldown: {cooldown_time_flash}")
 
+def update_slider_from_entry(event=None):
+    """Update the slider when the entry value changes."""
+    try:
+        value = float(scaleInput.get())  # Get the input value
+        value = max(0, min(100, value))  # Clamp value between 0 and 100
+        scale_float.set(value)  # Update slider variable
+    except ValueError:
+        pass
+
+def update_entry_from_slider(value):
+    """Update the entry when the slider moves."""
+    scaleInput.delete(0, tk.END)
+    scaleInput.insert(0, str(int(float(value))))
+
+
 if __name__ == "__main__":
     #variables
     sound_file = 'Sounds\Pst.mp3'
@@ -146,79 +165,92 @@ if __name__ == "__main__":
 
     #window config
     window = CTk()
-    window.geometry("300x250")
+    window.geometry("300x220")
     window.title("ShushBot")
     #icon = tk.PhotoImage(file='Images\icon.png')
     #window.iconphoto(True, icon)
     set_default_color_theme("dark-blue")
     #window.config(background="#5cfcff")
+    Tabs = CTkTabview(window)
+    Tabs.pack(pady=10)
+
+    mainTab = Tabs.add("Main")
+    settingsTab = Tabs.add("Settings")
+    deviceTab = Tabs.add("Device")
 
     #window parts
-    deviceFrame = CTkFrame(window)
-    #deviceFrame.pack()
+    deviceFrame = CTkFrame(deviceTab)
+    deviceFrame.pack()
     inputCombobox = CTkComboBox(deviceFrame, values=["mic 1","mic 2","mic 3"],)
     inputCombobox.pack()
 
     outputCombobox = CTkComboBox(deviceFrame, values=["device 1","device 2","device 3"],)
     outputCombobox.pack()
 
-    notificationFrame = CTkFrame(window)
+    notificationFrame = CTkFrame(settingsTab)
     notificationFrame.pack()
 
     validate_int = window.register(validate_int_input)
 
     soundFrame = CTkFrame(notificationFrame)
-    soundFrame.pack()
+    soundFrame.pack(pady=5)
     soundSwitch = CTkSwitch(soundFrame,text="Sound", command=toggleSound)
     soundSwitch.select()
     playSound = soundSwitch.get()
     soundSwitch.pack(side="left", padx=5, pady=5)
-    flashLabel = CTkLabel(soundFrame, text="CoolDown(s):", font=("Arial",15))
+    flashLabel = CTkLabel(soundFrame, text="CoolDown(s):", font=("Roboto",15))
     flashLabel.pack()
-    soundCoolDown = CTkEntry(soundFrame, placeholder_text="3",validate="key", validatecommand=(validate_int, "%P"))
-    soundCoolDown.pack(side="right", padx=5, pady=5)
-    soundUpdate_button = CTkButton(soundFrame, text="Set", command=update_cooldown_sound)
-    soundUpdate_button.pack(side="right",pady=5)
+    soundCoolDown = CTkEntry(soundFrame, placeholder_text="3",validate="key", width=40, validatecommand=(validate_int, "%P"))
+    soundCoolDown.pack(side="left", padx=5, pady=5)
+    soundUpdate_button = CTkButton(soundFrame, text="Set", command=update_cooldown_sound, width=40)
+    soundUpdate_button.pack(padx=5, pady=5)
 
     flashFrame = CTkFrame(notificationFrame)
-    flashFrame.pack()
+    flashFrame.pack(pady=5)
     flashSwitch = CTkSwitch(flashFrame,text="Flash", command=toggleFlash)
     flashSwitch.select()
     flash = flashSwitch.get()
     flashSwitch.pack(side="left", padx=5, pady=5)
-    flashLabel = CTkLabel(flashFrame, text="CoolDown(s):", font=("Arial",15))
+    flashLabel = CTkLabel(flashFrame, text="CoolDown(s):", font=("Roboto",15))
     flashLabel.pack()
-    flashCoolDown = CTkEntry(flashFrame, placeholder_text="0", validate="key", validatecommand=(validate_int, "%P"))
-    flashCoolDown.pack(side="right", padx=5, pady=5)
-    flashUpdate_button = CTkButton(flashFrame, text="Set", command=update_cooldown_flash)
-    flashUpdate_button.pack(side="right",pady=5)
+    flashCoolDown = CTkEntry(flashFrame, placeholder_text="0", validate="key",width=40, validatecommand=(validate_int, "%P"))
+    flashCoolDown.pack(side="left", padx=5, pady=5)
+    flashUpdate_button = CTkButton(flashFrame, text="Set", command=update_cooldown_flash, width=40)
+    flashUpdate_button.pack(padx=5, pady=5)
 
 
 
-    scaleLable = CTkLabel(window,text="Threshold slider :", font=("Arial",20))  
-    scaleLable.pack()
 
-    scaleFrame = CTkFrame(window)
+    scaleFrame = CTkFrame(mainTab)
     scaleFrame.pack()
-    scaleInput = CTkEntry(scaleFrame, placeholder_text="80")
-    scaleInput.pack()
+
+    inputFrame = CTkFrame(scaleFrame)
+    inputFrame.pack()
+
+    scaleLable = CTkLabel(inputFrame,text="Threshold slider :", font=("Roboto",20))  
+    scaleLable.pack(side="left", padx=5, pady=5)
+
+    scaleInput = CTkEntry(inputFrame, placeholder_text="80", width=40, validate="key", validatecommand=(validate_int, "%P"))
+    scaleInput.pack(side="right", padx=5, pady=5)
+    scaleInput.bind("<Return>", update_slider_from_entry)  # Press Enter
+    scaleInput.bind("<FocusOut>", update_slider_from_entry)  # Click outside
 
     scale_float = tk.DoubleVar(value = 80)
     scale = CTkSlider(scaleFrame, 
-                      command = lambda value: print(scale_float.get()), 
+                      command=update_entry_from_slider, 
                       from_= 0, 
                       to= 100,
-                    variable= scale_float )
-    scale.pack()
+                      variable= scale_float)
+    scale.pack(padx=5, pady=5)
     progress_float = tk.DoubleVar(value=0)
     progress = CTkProgressBar(scaleFrame,
                                variable = progress_float)
-    progress.pack()
+    progress.pack(padx=5, pady=5)
 
-    listenSwitch = CTkSwitch(window,text="Listen", command=toggleListen)
+    listenSwitch = CTkSwitch(mainTab,text="Listen", command=toggleListen)
     listenSwitch.deselect()
     listening = listenSwitch.get()
-    listenSwitch.pack()
+    listenSwitch.pack(padx=5, pady=5)
 
     listen_thread = threading.Thread(target=listen, daemon=True)
     listen_thread.start()
