@@ -10,6 +10,9 @@ import threading
 import pygame
 from PIL import Image, ImageTk
 import pystray
+import ctypes
+import win32gui
+import win32con
 
 #Global Variables
 cooldown_time_sound = 3
@@ -21,7 +24,68 @@ input_devices = [d['name'] for d in devices if d['max_input_channels'] > 0]
 all_files = os.listdir("Sounds")
 sound_files = [file for file in all_files if file.endswith(('.mp3', '.wav'))]
 
+pygame.init()
 pygame.mixer.init()
+
+screen_info = pygame.display.Info()
+screen_width, screen_height = screen_info.current_w, screen_info.current_h
+
+RED = (255, 0, 0)
+TRANSPARENT = (0, 0, 0, 0)
+
+screen = pygame.display.set_mode((screen_width, screen_height), pygame.NOFRAME)
+hwnd = pygame.display.get_wm_info()["window"]
+win32gui.SetWindowLong(hwnd, win32con.GWL_EXSTYLE,
+                       win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE) | win32con.WS_EX_LAYERED | win32con.WS_EX_TRANSPARENT)
+win32gui.SetLayeredWindowAttributes(hwnd, 0, 255, win32con.LWA_COLORKEY)
+win32gui.SetWindowLong(hwnd, win32con.GWL_EXSTYLE,
+                       win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE) | win32con.WS_EX_TOOLWINDOW)
+win32gui.ShowWindow(hwnd, win32con.SW_SHOWNOACTIVATE)
+
+win32gui.SetWindowLong(hwnd, win32con.GWL_EXSTYLE,
+                       win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE) | win32con.WS_EX_TOPMOST)
+#overlay = pygame.Surface((screen_width, screen_height), pygame.SRCALPHA, 32)  # Surface with alpha support
+#overlay = overlay.convert_alpha()
+#pygame.display.set_caption("Border Overlay")
+
+border_thickness = 20  
+border_visible = False
+running = True
+
+def pygame_event_loop():
+    """Runs the Pygame event loop in a separate thread."""
+    global running
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+        pygame.time.wait(10) 
+
+
+def show_border():
+    """Draws only the red border without filling the middle."""
+    global border_visible
+    border_visible = True
+
+    # Clear the screen first
+    screen.fill(TRANSPARENT)
+
+    # Draw the red border directly onto the screen
+    pygame.draw.rect(screen, RED, (0, 0, screen_width, border_thickness))  # Top border
+    pygame.draw.rect(screen, RED, (0, 0, border_thickness, screen_height))  # Left border
+    pygame.draw.rect(screen, RED, (screen_width - border_thickness, 0, border_thickness, screen_height))  # Right border
+    pygame.draw.rect(screen, RED, (0, screen_height - border_thickness, screen_width, border_thickness))  # Bottom border
+
+    pygame.display.update()
+
+def hide_border():
+    """Clears the border, making it disappear."""
+    global border_visible
+    border_visible = False
+
+    # Clear the screen so only the original background remains
+    screen.fill(TRANSPARENT)
+    pygame.display.update()
 
 def hide_window():
     window.withdraw()  # Hide the window
@@ -43,7 +107,10 @@ def show_tray_icon():
 
 def exit_app(icon=None, item=None):
     if icon:
-        icon.stop()  # Stop tray icon
+        icon.stop() 
+    global running
+    running = False
+    pygame.quit() 
     window.quit()
     window.destroy()  # Close the Tkinter app
 
@@ -67,6 +134,9 @@ def get_max_loudness(duration=0.1, fs=44100):
     # Return the maximum loudness value
     max_loudness = max(loudness_values)
     return max_loudness
+def create_boarder():
+    print()
+
 
 def create_ring():
     """Creates a fullscreen red ring window with a transparent center."""
@@ -132,14 +202,16 @@ def listen():
                 print(f"Maximum Loudness: {max_loudness:.2f} dB")
                 print("You are too loud!!")
 
-                if ring is None and flash and (time.time() - last_flashed >= cooldown_time_flash):  # Create the ring if it doesn't exist
-                    ring = create_ring() 
-                    ring.deiconify()
+                if not border_visible and flash and (time.time() - last_flashed >= cooldown_time_flash):  # Create the ring if it doesn't exist
+                    show_border()
+                    #ring = create_ring() 
+                    #ring.deiconify()
                   # Show the ring
             else:
-                if ring is not None:  # Hide the ring if it exists
-                    ring.withdraw()
-                    ring = None
+                if border_visible:
+                    hide_border()  # Hide the ring if it exists
+                    #ring.withdraw()
+                    #ring = None
             time.sleep(0.66)
         else:
             time.sleep(0.5)
@@ -311,6 +383,9 @@ if __name__ == "__main__":
     listenSwitch.deselect()
     listening = listenSwitch.get()
     listenSwitch.pack(padx=5, pady=5)
+
+    thread = threading.Thread(target=pygame_event_loop, daemon=True)
+    thread.start()
 
     listen_thread = threading.Thread(target=listen, daemon=True)
     listen_thread.start()
